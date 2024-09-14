@@ -1,6 +1,8 @@
 import numpy as np
 import logging
 from typing import List
+import random
+
 from players.g6_player.data import Move
 from timing_maze_state import TimingMazeState
 
@@ -80,8 +82,19 @@ class G6_Player:
         self.move_history = self.__update_history(new_move)
         return new_move.value
 
-    def __exploit(self) -> Move:
-        new_move = Move.RIGHT.value
+    def __exploit(self, current_state: TimingMazeState) -> Move:
+        if random.random() < 0.1:
+            new_move = random.choice(list(Move))
+        elif 0 > current_state.end_x:
+            new_move = Move.LEFT.value
+        elif 0 < current_state.end_x:
+            new_move = Move.RIGHT.value
+        elif 0 > current_state.end_y:
+            new_move = Move.UP.value
+        elif 0 < current_state.end_y:
+            new_move = Move.DOWN.value
+        else:
+            new_move = Move.WAIT.value
         # Todo: same as above comment about updating the move history
         self.move_history = self.__update_history(new_move)
-        return new_move.value
+        return new_move
