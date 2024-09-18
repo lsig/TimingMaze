@@ -39,6 +39,10 @@ class G6_Player:
         # the horizontal (1st idx) and vertical (2nd idx) edge indices
         self.edges = [None, None]
 
+        # tracking variables for inward spiral
+        self.phase = 0
+        self.layer = 0
+
     def move(self, current_percept: TimingMazeState) -> int:
         self.turn += 1
 
@@ -118,11 +122,11 @@ class G6_Player:
         """
         Move towards the southeast corner and perform inward spiral
         """
-        self.found_right_boundary = True if self.curr_pos[0] == self.edges[0] else False
-        self.found_down_boundary = True if self.curr_pos[1] == self.edges[1] else False
-        if not self.found_right_boundary:
+        found_right_boundary = True if self.curr_pos[0] == self.edges[0] else False
+        found_down_boundary = True if self.curr_pos[1] == self.edges[1] else False
+        if not found_right_boundary:
             return self.find_boundary(constants.RIGHT)
-        if not self.found_down_boundary:
+        if not found_down_boundary:
             return self.find_boundary(constants.DOWN)
         return self.inward_spiral()
 
@@ -152,18 +156,46 @@ class G6_Player:
         """
         Perform clockwise inward spiral from southeast corner.
         """
-        # Move northwest until radius touches southeast corner
+        # Set inward spiral phase and layer, and update search target
+        if self.curr_pos == self.search_target:
+            self.adjust_phase_and_target()
+        
+        return self.__find_best_move_towards_search_target()
 
-        # Move west until radius touches southwest corner
+    def adjust_phase_and_target(self):
+        if self.phase + 1 == 5:
+            self.layer += 1
+        self.phase = (self.phase + 1) % 5
+        
+        # Set search target so that radius touches southeast corner of previous layer
+        if self.phase == 0:
+            offset = int(np.floor(self.radius / np.sqrt(2)))
+            offset = 2 * offset if self.layer > 0 else offset
+            self.search_target = (self.curr_pos[0] - offset, self.curr_pos[1] - offset)    
 
-        # Move north until radius touches northwest corner
+        # Set search target so that radius touches southwest corner of previous layer
+        elif self.phase == 1:
+            offset = constants.map_dim - (int(np.floor(self.radius / np.sqrt(2))) * 2 +
+                                          4 * self.radius * self.layer)
+            self.search_target[0] = self.curr_pos[0] - offset
 
-        # Move east until radius touches northeast corner
+        # Set search target so that radius touches northwest corner of previous layer
+        elif self.phase == 2:
+            offset = constants.map_dim - (int(np.floor(self.radius / np.sqrt(2))) * 2 +
+                                          4 * self.radius * self.layer)
+            self.search_target[1] = self.curr_pos[1] - offset
 
-        # Move south until radius touches southeast corner
+        # Set search target so that radius touches northeast corner of previous layer
+        elif self.phase == 3:
+            offset = constants.map_dim - (int(np.floor(self.radius / np.sqrt(2))) * 2 +
+                                          4 * self.radius * self.layer)
+            self.search_target[0] = self.curr_pos[0] + offset
 
-        # Move northwest until radiu touches last starting point
-
+        # Set search target so that radius touches southeast corner of previous layer
+        elif self.phase == 4:
+            offset = constants.map_dim - (int(np.floor(self.radius / np.sqrt(2))) * 2 +
+                                          4 * self.radius * self.layer)
+            self.search_target[1] = self.curr_pos[1] + offset
 
     # def __explore(self) -> Move:
     #     # if the current search target has been found
