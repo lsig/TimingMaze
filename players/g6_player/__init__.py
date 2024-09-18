@@ -115,12 +115,63 @@ class G6_Player:
                 )
 
     def __explore(self) -> Move:
-        # if the current search target has been found
-        # find a new target
-        if self.seen[self.search_target[0], self.search_target[1]]:
-            self.__calculate_new_target()
+        """
+        Move towards the southeast corner and perform inward spiral
+        """
+        self.found_right_boundary = True if self.curr_pos[0] == self.edges[0] else False
+        self.found_down_boundary = True if self.curr_pos[1] == self.edges[1] else False
+        if not self.found_right_boundary:
+            return self.find_boundary(constants.RIGHT)
+        if not self.found_down_boundary:
+            return self.find_boundary(constants.DOWN)
+        return self.inward_spiral()
 
-        return self.__find_best_move_towards_search_target()
+    def find_boundary(self, direction) -> Move:
+        """
+        Traverse to right/down boundary by setting search target to the farthest right/down
+        direction. If edge is detected between current position and search target, set
+        search target to edge.
+        """
+        if direction == constants.RIGHT:
+            self.search_target = (constants.map_dim-1, 0)
+            if self.edges is not None and self.__border_between_target_and_curr(
+                self.edges[0], self.search_target[0], self.curr_pos[0]
+            ):
+                self.search_target[0] = self.edges[0]
+            return Move.RIGHT
+        
+        if direction == constants.DOWN:
+            self.search_target = (0, constants.map_dim-1)
+            if self.edges is not None and self.__border_between_target_and_curr(
+                self.edges[1], self.search_target[1], self.curr_pos[1]
+            ):
+                self.search_target[1] = self.edges[1]
+            return Move.DOWN
+
+    def inward_spiral(self):
+        """
+        Perform clockwise inward spiral from southeast corner.
+        """
+        # Move northwest until radius touches southeast corner
+
+        # Move west until radius touches southwest corner
+
+        # Move north until radius touches northwest corner
+
+        # Move east until radius touches northeast corner
+
+        # Move south until radius touches southeast corner
+
+        # Move northwest until radiu touches last starting point
+
+
+    # def __explore(self) -> Move:
+    #     # if the current search target has been found
+    #     # find a new target
+    #     if self.seen[self.search_target[0], self.search_target[1]]:
+    #         self.__calculate_new_target()
+
+    #     return self.__find_best_move_towards_search_target()
 
     def __find_best_move_towards_search_target(self) -> Move:
         """
