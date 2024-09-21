@@ -31,6 +31,7 @@ class G6_Player:
         self.maximum_door_frequency = maximum_door_frequency
         self.radius = radius
         self.turn = 0
+        self.cycle = 0
 
         # Variables to facilitate knowing where the player has been and if they are trapped
         self.stuck = 0
@@ -38,7 +39,7 @@ class G6_Player:
         self.prev_move = None
 
         # Initialize Maze object to hold information about cells and doors perceived by the drone
-        self.maze = Maze(self.turn, self.maximum_door_frequency, self.radius)
+        self.maze = Maze(self.turn, self.cycle, self.maximum_door_frequency, self.radius)
 
         # an interim target which the agent tries to navigate towards
         self.search_target = None
@@ -56,7 +57,8 @@ class G6_Player:
         __move() to determine the next move.
         """
         self.turn += 1
-        self.maze.update_maze(current_percept, self.turn)
+        self.cycle = self.turn % self.maximum_door_frequency if (self.turn % self.maximum_door_frequency) != 0 else self.maximum_door_frequency
+        self.maze.update_maze(current_percept, self.cycle)
         self.__update_history()
         player_move = self.__move(current_percept)
         

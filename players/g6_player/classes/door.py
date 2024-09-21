@@ -1,33 +1,40 @@
 from constants import *
 from math import gcd
+import numpy as np
+from array import ArrayType
 
 
 class Door:
-    def __init__(self, door_type: int) -> None:
+    def __init__(self, door_type: int, max_door_freq: int) -> None:
         self.door_type: int = door_type
         self.state: int = CLOSED
-        self.turn: int = 0
+        self.max_door_freq: int = max_door_freq
         self.freq: int = 0
-        self.turns_open: list[int] = []
+        self.cycles_observed: ArrayType[int] = np.zeros(max_door_freq)
+        self.complete_observed: bool = False
+        self.cycles_open: list[int] = []
 
-    def update_turn(self, state: int, turn: int):
+    def update_turn(self, state: int, cycle: int):
         """
         Called on every turn
         """
-        self.state = state
-        self.turn = turn
-        if state == OPEN:
-            self.turns_open.append(turn)
-            if len(self.turns_open) > 1:
-                self.freq = self.__update_freq()
+
+        if not self.complete_observed:
+            # Track which turn cycles we have observed this door at
+            self.cycles_observed[cycle - 1] = 1
+            if self.cycles_observed.sum() == self.max_door_freq:
+                self.complete_observed = True
+
+            if state == OPEN:
+                self.cycles_open.append(cycle)
+                if len(self.cycles_open) > 0:
+                    self.__update_freq()
+        else:
+            pass
 
     def __update_freq(self):
         """
-        Update frequency of door based on previous turns when open door was detected
+        Update frequency of door based on previous cycles when open door was detected open
         """
-        frequencies = []
-        for i in range(len(self.turns_open) - 1):
-            for j in range(i, len(self.turns_open)):
-                frequencies.append(abs(self.turns_open[j] - self.turns_open[i]))
-        self.freq = gcd(*frequencies)
+        self.freq = gcd(*self.cycles_open)
 
