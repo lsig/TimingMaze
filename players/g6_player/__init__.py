@@ -84,9 +84,11 @@ class G6_Player:
         if not self.found_down_boundary:
             self.found_down_boundary = self.__is_boundary_in_sight(DOWN)
 
+        # Perform inward spiral when both boundaries are visible
         if self.found_right_boundary and self.found_down_boundary:
             return self.__inward_spiral()    
 
+        # Set search target based on visible boundaries
         if not self.found_right_boundary and not self.found_down_boundary:
             self.search_target = (self.maze.east_end, self.maze.south_end)
         elif not self.found_right_boundary:
@@ -98,40 +100,13 @@ class G6_Player:
         self.maze.target_pos = self.__set_target_on_radius()
         result, cost = a_star(self.maze.current_cell(), self.maze.target_cell())
         print(f"TARGET: {len(result)} moves - {cost} cost")
+        move = result[0]
         
-        # Find least obstructed direction towards target
-        target_directions = self.__get_target_directions()
-        path1_blocked = self.__is_path_blocked(target_directions[0])
-        path2_blocked = self.__is_path_blocked(target_directions[1])
-        path3_blocked = self.__is_path_blocked(target_directions[2])
-        path4_blocked = self.__is_path_blocked(target_directions[3])
-
         # If no path to target, move in least obstructed direction
         if cost == float("inf"):
-            if not path1_blocked and path2_blocked:
-                # Set target direction to target_directions[0]
-                print(f'Least obstructed direction: {move_to_str(target_directions[0])}')
-                self.maze.target_pos = self.__set_target_on_least_blocked_direction(target_directions[0])
+            move = self.__find_new_direction()
 
-            elif path1_blocked and not path2_blocked:
-                # Set target direction to target_directions[1]
-                print(f'Least obstructed direction: {move_to_str(target_directions[1])}')
-                self.maze.target_pos = self.__set_target_on_least_blocked_direction(target_directions[1])
-
-            elif path1_blocked and path2_blocked and not path3_blocked:
-                # Set target direction to target_directions[2]
-                print(f'Least obstructed direction: {move_to_str(target_directions[2])}')
-                self.maze.target_pos = self.__set_target_on_least_blocked_direction(target_directions[2])
-                
-            elif path1_blocked and path2_blocked and path3_blocked and not path4_blocked:
-                # Set target direction to target_directions[3]
-                print(f'Least obstructed direction: {move_to_str(target_directions[3])}')
-                self.maze.target_pos = self.__set_target_on_least_blocked_direction(target_directions[3])
-
-            result, cost = a_star(self.maze.current_cell(), self.maze.target_cell())
-            print(f"TARGET: {len(result)} moves - {cost} cost")
-
-        return result[0]
+        return move
 
     def __is_boundary_in_sight(self, direction: int) -> bool:
         """
@@ -162,20 +137,6 @@ class G6_Player:
                 curr_cell = curr_cell.n_cell
 
         return False
-    
-    def __set_target_on_radius(self) -> tuple:
-        """
-        Set target position on drone radius towards search target
-        """
-        vec_x = self.search_target[0] - self.maze.curr_pos[0]
-        vec_y = self.search_target[1] - self.maze.curr_pos[1]
-        norm = np.sqrt(vec_x**2 + vec_y**2)
-        if norm > self.radius:
-            x = int(np.floor(vec_x / norm * self.radius)) + self.maze.curr_pos[0]
-            y = int(np.floor(vec_y / norm * self.radius)) + self.maze.curr_pos[1]
-        else:
-            x, y = self.search_target
-        return (x, y)
 
     def __inward_spiral(self) -> Move:
         """
@@ -198,48 +159,116 @@ class G6_Player:
         result, cost = a_star(self.maze.current_cell(), self.maze.target_cell())
         print(f"TARGET: {len(result)} moves - {cost} cost")
 
-        # Find least obstructed direction towards target
+        move = result[0]
+
+        # If no path to target, move in least obstructed direction
+        if cost == float("inf"):
+            move = self.__find_new_direction()
+
+        return move
+
+    def __adjust_phase_and_target(self):
+        """
+        Adjust phase, layer and search target to perform inward spiral
+        """
+        self.phase = (self.phase + 1) % 5
+        if self.phase == 4:
+            self.layer += 1
+
+        offset = int(np.floor(self.radius / np.sqrt(2)))
+        cum_offset = (2 * self.layer + 1) * offset
+
+        # Set search target so that radius touches southeast corner of previous layer
+        if self.phase == 4:
+            self.search_target = (
+                self.maze.east_end - cum_offset,
+                self.maze.south_end - cum_offset,
+            )
+
+        # Set search target so that radius touches southwest corner of previous layer
+        elif self.phase == LEFT:
+            self.search_target = (
+                self.maze.west_end + cum_offset,
+                self.maze.south_end - cum_offset,
+            )
+
+        # Set search target so that radius touches northwest corner of previous layer
+        elif self.phase == UP:
+            self.search_target = (
+                self.maze.west_end + cum_offset,
+                self.maze.north_end + cum_offset,
+            )
+
+        # Set search target so that radius touches northeast corner of previous layer
+        elif self.phase == RIGHT:
+            self.search_target = (
+                self.maze.east_end - cum_offset,
+                self.maze.north_end + cum_offset,
+            )
+
+        # Set search target so that radius touches southeast corner of previous layer
+        # Extra offset from south border to avoid overlapping with previous layer
+        elif self.phase == DOWN:
+            self.search_target = (
+                self.maze.east_end - cum_offset,
+                self.maze.south_end - cum_offset - offset,
+            )
+
+    def __set_target_on_radius(self) -> tuple:
+        """
+        Set target position on drone radius towards search target
+        """
+        vec_x = self.search_target[0] - self.maze.curr_pos[0]
+        vec_y = self.search_target[1] - self.maze.curr_pos[1]
+        norm = np.sqrt(vec_x**2 + vec_y**2)
+        if norm > self.radius:
+            x = int(np.floor(vec_x / norm * self.radius)) + self.maze.curr_pos[0]
+            y = int(np.floor(vec_y / norm * self.radius)) + self.maze.curr_pos[1]
+        else:
+            x, y = self.search_target
+
+        # Ensure target is within maze boundaries
+        if x < self.maze.west_end:
+            x = self.maze.west_end
+        elif x > self.maze.east_end:
+            x = self.maze.east_end
+        if y < self.maze.north_end:
+            y = self.maze.north_end
+        elif y > self.maze.south_end:
+            y = self.maze.south_end
+
+        return (x, y)
+
+    def __find_new_direction(self) -> int:
+        """
+        Find least obstructed direction towards target
+        """
         target_directions = self.__get_target_directions()
         path1_blocked = self.__is_path_blocked(target_directions[0])
         path2_blocked = self.__is_path_blocked(target_directions[1])
         path3_blocked = self.__is_path_blocked(target_directions[2])
         path4_blocked = self.__is_path_blocked(target_directions[3])
 
-        # If no path to target, move in least obstructed direction
-        if cost == float("inf"):
-            if not path1_blocked and path2_blocked:
-                # Set target direction to target_directions[0]
-                self.maze.target_pos = self.__set_target_on_least_blocked_direction(target_directions[0])
+        if not path1_blocked and path2_blocked:
+            # Set target direction to target_directions[0]
+            self.maze.target_pos = self.__set_target_on_least_blocked_direction(target_directions[0])
 
-            elif path1_blocked and not path2_blocked:
-                # Set target direction to target_directions[1]
-                self.maze.target_pos = self.__set_target_on_least_blocked_direction(target_directions[1])
+        elif path1_blocked and not path2_blocked:
+            # Set target direction to target_directions[1]
+            self.maze.target_pos = self.__set_target_on_least_blocked_direction(target_directions[1])
 
-            elif path1_blocked and path2_blocked and not path3_blocked:
-                # Set target direction to target_directions[2]
-                self.maze.target_pos = self.__set_target_on_least_blocked_direction(target_directions[2])
-                
-            elif path1_blocked and path2_blocked and path3_blocked and not path4_blocked:
-                # Set target direction to target_directions[3]
-                self.maze.target_pos = self.__set_target_on_least_blocked_direction(target_directions[3])
+        elif path1_blocked and path2_blocked and not path3_blocked:
+            # Set target direction to target_directions[2]
+            self.maze.target_pos = self.__set_target_on_least_blocked_direction(target_directions[2])
+            
+        elif path1_blocked and path2_blocked and path3_blocked and not path4_blocked:
+            # Set target direction to target_directions[3]
+            self.maze.target_pos = self.__set_target_on_least_blocked_direction(target_directions[3])
 
-            result, cost = a_star(self.maze.current_cell(), self.maze.target_cell())
-            print(f"TARGET: {len(result)} moves - {cost} cost")
+        result, cost = a_star(self.maze.current_cell(), self.maze.target_cell())
+        print(f"TARGET: {len(result)} moves - {cost} cost")
 
         return result[0]
-
-    def __set_target_on_least_blocked_direction(self, direction) -> tuple:
-        """
-        Set target position on least obstructed direction
-        """
-        if direction == LEFT:
-            return (self.maze.curr_pos[0] - self.radius, self.maze.curr_pos[1])
-        elif direction == UP:
-            return (self.maze.curr_pos[0], self.maze.curr_pos[1] - self.radius)
-        elif direction == RIGHT:
-            return (self.maze.curr_pos[0] + self.radius, self.maze.curr_pos[1])
-        elif direction == DOWN:
-            return (self.maze.curr_pos[0], self.maze.curr_pos[1] + self.radius)
 
     def __get_target_directions(self) -> list:
         """
@@ -307,52 +336,18 @@ class G6_Player:
             else:
                 return curr_cell.w_path == 0
 
-    def __adjust_phase_and_target(self):
+    def __set_target_on_least_blocked_direction(self, direction) -> tuple:
         """
-        Adjust phase, layer and search target to perform inward spiral
+        Set target position on least obstructed direction
         """
-        self.phase = (self.phase + 1) % 5
-        if self.phase == 4:
-            self.layer += 1
-
-        offset = int(np.floor(self.radius / np.sqrt(2)))
-        cum_offset = (2 * self.layer + 1) * offset
-
-        # Set search target so that radius touches southeast corner of previous layer
-        if self.phase == 4:
-            self.search_target = (
-                self.maze.east_end - cum_offset,
-                self.maze.south_end - cum_offset,
-            )
-
-        # Set search target so that radius touches southwest corner of previous layer
-        elif self.phase == LEFT:
-            self.search_target = (
-                self.maze.west_end + cum_offset,
-                self.maze.south_end - cum_offset,
-            )
-
-        # Set search target so that radius touches northwest corner of previous layer
-        elif self.phase == UP:
-            self.search_target = (
-                self.maze.west_end + cum_offset,
-                self.maze.north_end + cum_offset,
-            )
-
-        # Set search target so that radius touches northeast corner of previous layer
-        elif self.phase == RIGHT:
-            self.search_target = (
-                self.maze.east_end - cum_offset,
-                self.maze.north_end + cum_offset,
-            )
-
-        # Set search target so that radius touches southeast corner of previous layer
-        # Extra offset from south border to avoid overlapping with previous layer
-        elif self.phase == DOWN:
-            self.search_target = (
-                self.maze.east_end - cum_offset,
-                self.maze.south_end - cum_offset - offset,
-            )
+        if direction == LEFT:
+            return (self.maze.curr_pos[0] - self.radius, self.maze.curr_pos[1])
+        elif direction == UP:
+            return (self.maze.curr_pos[0], self.maze.curr_pos[1] - self.radius)
+        elif direction == RIGHT:
+            return (self.maze.curr_pos[0] + self.radius, self.maze.curr_pos[1])
+        elif direction == DOWN:
+            return (self.maze.curr_pos[0], self.maze.curr_pos[1] + self.radius)
 
     def __exploit(self, current_state: TypedTimingMazeState) -> Move:
         """
