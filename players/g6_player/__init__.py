@@ -59,6 +59,7 @@ class G6_Player:
         self.maze.update(current_percept)
         player_move = self.__move(current_percept)
 
+        print(f"Current position: {self.maze.curr_pos}, Target position: {self.maze.target_pos}, Search target: {self.search_target}")
         print(f"MOVE: {move_to_str(player_move)}")
         return player_move.value
 
@@ -93,9 +94,43 @@ class G6_Player:
         elif not self.found_down_boundary:
             self.search_target = (self.maze.curr_pos[0], self.maze.south_end)
 
+        # A* search to target
         self.maze.target_pos = self.__set_target_on_radius()
         result, cost = a_star(self.maze.current_cell(), self.maze.target_cell())
         print(f"TARGET: {len(result)} moves - {cost} cost")
+        
+        # Find least obstructed direction towards target
+        target_directions = self.__get_target_directions()
+        path1_freq = self.__get_path_freq(target_directions[0])
+        path2_freq = self.__get_path_freq(target_directions[1])
+        path3_freq = self.__get_path_freq(target_directions[2])
+        path4_freq = self.__get_path_freq(target_directions[3])
+
+        # If no path to target, move in least obstructed direction
+        if cost == float("inf"):
+            if path1_freq != 0 and path2_freq == 0:
+                # Set target direction to target_directions[0]
+                print(f'Least obstructed direction: {move_to_str(target_directions[0])}')
+                self.maze.target_pos = self.__set_target_on_least_blocked_direction(target_directions[0])
+
+            elif path1_freq == 0 and path2_freq != 0:
+                # Set target direction to target_directions[1]
+                print(f'Least obstructed direction: {move_to_str(target_directions[1])}')
+                self.maze.target_pos = self.__set_target_on_least_blocked_direction(target_directions[1])
+
+            elif path1_freq == 0 and path2_freq == 0 and path3_freq != 0:
+                # Set target direction to target_directions[2]
+                print(f'Least obstructed direction: {move_to_str(target_directions[2])}')
+                self.maze.target_pos = self.__set_target_on_least_blocked_direction(target_directions[2])
+                
+            elif path1_freq == 0 and path2_freq == 0 and path3_freq == 0 and path4_freq != 0:
+                # Set target direction to target_directions[3]
+                print(f'Least obstructed direction: {move_to_str(target_directions[3])}')
+                self.maze.target_pos = self.__set_target_on_least_blocked_direction(target_directions[3])
+
+            result, cost = a_star(self.maze.current_cell(), self.maze.target_cell())
+            print(f"TARGET: {len(result)} moves - {cost} cost")
+
         return result[0]
 
     def __is_boundary_in_sight(self, direction: int) -> bool:
@@ -163,36 +198,58 @@ class G6_Player:
         result, cost = a_star(self.maze.current_cell(), self.maze.target_cell())
         print(f"TARGET: {len(result)} moves - {cost} cost")
 
-        # Move in least obstructed direction towards target
-        target_directions = self.__get_target_directions()     
-        door1_freq = self.__get_door_freq(target_directions[0])
-        door2_freq = self.__get_door_freq(target_directions[1])
-        door3_freq = self.__get_door_freq(target_directions[2])
-        door4_freq = self.__get_door_freq(target_directions[3])
+        # Find least obstructed direction towards target
+        target_directions = self.__get_target_directions()
+        path1_freq = self.__get_path_freq(target_directions[0])
+        path2_freq = self.__get_path_freq(target_directions[1])
+        path3_freq = self.__get_path_freq(target_directions[2])
+        path4_freq = self.__get_path_freq(target_directions[3])
 
-        # [TODO] Can experiment with different cost and freq thresholds
+        # If no path to target, move in least obstructed direction
         if cost == float("inf"):
-            if door1_freq != 0:
-                return Move.target_directions[0]
-            elif door2_freq != 0:
-                return Move.target_directions[1]
-            elif door3_freq != 0:
-                return Move.target_directions[2]
-            elif door4_freq != 0:
-                return Move.target_directions[3]
+            if path1_freq != 0 and path2_freq == 0:
+                # Set target direction to target_directions[0]
+                self.maze.target_pos = self.__set_target_on_least_blocked_direction(target_directions[0])
+
+            elif path1_freq == 0 and path2_freq != 0:
+                # Set target direction to target_directions[1]
+                self.maze.target_pos = self.__set_target_on_least_blocked_direction(target_directions[1])
+
+            elif path1_freq == 0 and path2_freq == 0 and path3_freq != 0:
+                # Set target direction to target_directions[2]
+                self.maze.target_pos = self.__set_target_on_least_blocked_direction(target_directions[2])
+                
+            elif path1_freq == 0 and path2_freq == 0 and path3_freq == 0 and path4_freq != 0:
+                # Set target direction to target_directions[3]
+                self.maze.target_pos = self.__set_target_on_least_blocked_direction(target_directions[3])
+
+            result, cost = a_star(self.maze.current_cell(), self.maze.target_cell())
+            print(f"TARGET: {len(result)} moves - {cost} cost")
 
         return result[0]
 
+    def __set_target_on_least_blocked_direction(self, direction) -> tuple:
+        """
+        Set target position on least obstructed direction
+        """
+        if direction == LEFT:
+            return (self.maze.curr_pos[0] - self.radius, self.maze.curr_pos[1])
+        elif direction == UP:
+            return (self.maze.curr_pos[0], self.maze.curr_pos[1] - self.radius)
+        elif direction == RIGHT:
+            return (self.maze.curr_pos[0] + self.radius, self.maze.curr_pos[1])
+        elif direction == DOWN:
+            return (self.maze.curr_pos[0], self.maze.curr_pos[1] + self.radius)
+
     def __get_target_directions(self) -> list:
         """
-        Get directions to target based on current and target positions
+        Rank directions based on distance to target and from border.
         """
-        # Rank directions based on distance to target
         left_dist = max(self.maze.curr_pos[0] - self.maze.target_pos[0], 0)
         up_dist = max(self.maze.curr_pos[1] - self.maze.target_pos[1], 0)
         right_dist = max(self.maze.target_pos[0] - self.maze.curr_pos[0], 0)
         down_dist = max(self.maze.target_pos[1] - self.maze.curr_pos[1], 0)
-        dist_arr = [left_dist, up_dist, right_dist, down_dist]
+        dist_arr = np.array([left_dist, up_dist, right_dist, down_dist])
 
         # Sort in descending order
         rank = np.argsort(-dist_arr)
@@ -223,19 +280,19 @@ class G6_Player:
 
         return rank
 
-    def __get_door_freq(self, direction: int) -> int:
+    def __get_path_freq(self, direction: int) -> int:
         """
         Get the frequency of the door in a given direction
         """
         curr_cell = self.maze.current_cell()
         if direction == UP:
-            return curr_cell.n_door.freq
+            return curr_cell.n_path
         elif direction == RIGHT:
-            return curr_cell.e_door.freq
+            return curr_cell.e_path
         elif direction == DOWN:
-            return curr_cell.s_door.freq
+            return curr_cell.s_path
         elif direction == LEFT:
-            return curr_cell.w_door.freq
+            return curr_cell.w_path
 
     def __adjust_phase_and_target(self):
         """
