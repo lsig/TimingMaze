@@ -101,29 +101,29 @@ class G6_Player:
         
         # Find least obstructed direction towards target
         target_directions = self.__get_target_directions()
-        path1_freq = self.__get_path_freq(target_directions[0])
-        path2_freq = self.__get_path_freq(target_directions[1])
-        path3_freq = self.__get_path_freq(target_directions[2])
-        path4_freq = self.__get_path_freq(target_directions[3])
+        path1_blocked = self.__is_path_blocked(target_directions[0])
+        path2_blocked = self.__is_path_blocked(target_directions[1])
+        path3_blocked = self.__is_path_blocked(target_directions[2])
+        path4_blocked = self.__is_path_blocked(target_directions[3])
 
         # If no path to target, move in least obstructed direction
         if cost == float("inf"):
-            if path1_freq != 0 and path2_freq == 0:
+            if not path1_blocked and path2_blocked:
                 # Set target direction to target_directions[0]
                 print(f'Least obstructed direction: {move_to_str(target_directions[0])}')
                 self.maze.target_pos = self.__set_target_on_least_blocked_direction(target_directions[0])
 
-            elif path1_freq == 0 and path2_freq != 0:
+            elif path1_blocked and not path2_blocked:
                 # Set target direction to target_directions[1]
                 print(f'Least obstructed direction: {move_to_str(target_directions[1])}')
                 self.maze.target_pos = self.__set_target_on_least_blocked_direction(target_directions[1])
 
-            elif path1_freq == 0 and path2_freq == 0 and path3_freq != 0:
+            elif path1_blocked and path2_blocked and not path3_blocked:
                 # Set target direction to target_directions[2]
                 print(f'Least obstructed direction: {move_to_str(target_directions[2])}')
                 self.maze.target_pos = self.__set_target_on_least_blocked_direction(target_directions[2])
                 
-            elif path1_freq == 0 and path2_freq == 0 and path3_freq == 0 and path4_freq != 0:
+            elif path1_blocked and path2_blocked and path3_blocked and not path4_blocked:
                 # Set target direction to target_directions[3]
                 print(f'Least obstructed direction: {move_to_str(target_directions[3])}')
                 self.maze.target_pos = self.__set_target_on_least_blocked_direction(target_directions[3])
@@ -200,26 +200,26 @@ class G6_Player:
 
         # Find least obstructed direction towards target
         target_directions = self.__get_target_directions()
-        path1_freq = self.__get_path_freq(target_directions[0])
-        path2_freq = self.__get_path_freq(target_directions[1])
-        path3_freq = self.__get_path_freq(target_directions[2])
-        path4_freq = self.__get_path_freq(target_directions[3])
+        path1_blocked = self.__is_path_blocked(target_directions[0])
+        path2_blocked = self.__is_path_blocked(target_directions[1])
+        path3_blocked = self.__is_path_blocked(target_directions[2])
+        path4_blocked = self.__is_path_blocked(target_directions[3])
 
         # If no path to target, move in least obstructed direction
         if cost == float("inf"):
-            if path1_freq != 0 and path2_freq == 0:
+            if not path1_blocked and path2_blocked:
                 # Set target direction to target_directions[0]
                 self.maze.target_pos = self.__set_target_on_least_blocked_direction(target_directions[0])
 
-            elif path1_freq == 0 and path2_freq != 0:
+            elif path1_blocked and not path2_blocked:
                 # Set target direction to target_directions[1]
                 self.maze.target_pos = self.__set_target_on_least_blocked_direction(target_directions[1])
 
-            elif path1_freq == 0 and path2_freq == 0 and path3_freq != 0:
+            elif path1_blocked and path2_blocked and not path3_blocked:
                 # Set target direction to target_directions[2]
                 self.maze.target_pos = self.__set_target_on_least_blocked_direction(target_directions[2])
                 
-            elif path1_freq == 0 and path2_freq == 0 and path3_freq == 0 and path4_freq != 0:
+            elif path1_blocked and path2_blocked and path3_blocked and not path4_blocked:
                 # Set target direction to target_directions[3]
                 self.maze.target_pos = self.__set_target_on_least_blocked_direction(target_directions[3])
 
@@ -245,6 +245,7 @@ class G6_Player:
         """
         Rank directions based on distance to target and from border.
         """
+        # Calculate distance to target in each direction
         left_dist = max(self.maze.curr_pos[0] - self.maze.target_pos[0], 0)
         up_dist = max(self.maze.curr_pos[1] - self.maze.target_pos[1], 0)
         right_dist = max(self.maze.target_pos[0] - self.maze.curr_pos[0], 0)
@@ -280,19 +281,31 @@ class G6_Player:
 
         return rank
 
-    def __get_path_freq(self, direction: int) -> int:
+    def __is_path_blocked(self, direction: int) -> bool:
         """
-        Get the frequency of the door in a given direction
+        Get the frequency of the path in a given direction
         """
         curr_cell = self.maze.current_cell()
         if direction == UP:
-            return curr_cell.n_path
+            if curr_cell.n_cell:
+                return curr_cell.n_path == 0 or curr_cell.n_cell.n_path == 0
+            else:
+                return curr_cell.n_path == 0
         elif direction == RIGHT:
-            return curr_cell.e_path
+            if curr_cell.e_cell:
+                return curr_cell.e_path == 0 or curr_cell.e_cell.e_path == 0
+            else:
+                return curr_cell.e_path == 0
         elif direction == DOWN:
-            return curr_cell.s_path
+            if curr_cell.s_cell:
+                return curr_cell.s_path == 0 or curr_cell.s_cell.s_path == 0
+            else:
+                return curr_cell.s_path == 0
         elif direction == LEFT:
-            return curr_cell.w_path
+            if curr_cell.w_cell:
+                return curr_cell.w_path == 0 or curr_cell.w_cell.w_path == 0
+            else:
+                return curr_cell.w_path == 0
 
     def __adjust_phase_and_target(self):
         """
